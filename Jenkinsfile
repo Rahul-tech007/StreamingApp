@@ -1,34 +1,35 @@
 pipeline {
-    agent any
+agent any
 
-    environment {
-        AWS_REGION = 'ap-south-1'
-        ECR_REGISTRY = '<account-id>.dkr.ecr.ap-south-1.amazonaws.com'
+```
+environment {
+    AWS_REGION = 'ap-south-1'
+    ECR_REGISTRY = '975630231376.dkr.ecr.ap-south-1.amazonaws.com'
+}
+
+stages {
+
+    stage('Verify Docker') {
+        steps {
+            sh 'docker --version'
+        }
     }
 
-    stages {
-
-        stage('Checkout') {
-            steps {
-                git branch: 'main',
-                url: 'https://github.com/<user>/StreamingApp.git'
-            }
+    stage('Verify AWS CLI') {
+        steps {
+            sh 'aws --version'
         }
+    }
 
-        stage('Build Frontend') {
-            steps {
-                sh 'docker build -t frontend ./frontend'
-            }
-        }
-
-        stage('Build Backend') {
-            steps {
-                sh 'docker build -t backend ./backend'
-            }
-        }
-
-        stage('Login ECR') {
-            steps {
+    stage('Login ECR') {
+        steps {
+            withCredentials([
+                usernamePassword(
+                    credentialsId: 'aws-ecr-creds',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )
+            ]) {
                 sh '''
                 aws ecr get-login-password \
                 --region $AWS_REGION \
@@ -38,17 +39,17 @@ pipeline {
                 '''
             }
         }
+    }
 
-        stage('Push Images') {
-            steps {
-                sh '''
-                docker tag frontend $ECR_REGISTRY/streaming-frontend:latest
-                docker tag backend $ECR_REGISTRY/streaming-backend:latest
-
-                docker push $ECR_REGISTRY/streaming-frontend:latest
-                docker push $ECR_REGISTRY/streaming-backend:latest
-                '''
-            }
+    stage('Verify ECR Access') {
+        steps {
+            sh '''
+            aws ecr describe-repositories \
+            --region $AWS_REGION
+            '''
         }
     }
+}
+```
+
 }
